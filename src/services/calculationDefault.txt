@@ -1,0 +1,129 @@
+// Import the helper function to find engine details from aircraft data
+import { findEngine } from '../data/aircraftData';
+
+// Main function to calculate takeoff performance based on input parameters
+export const calculateTakeoffPerformance = (params) => {
+  // Retrieve engine details based on aircraft type, variant, and engine type
+  const engine = findEngine(params.aircraftType, params.aircraftVariant, params.engineType);
+  
+  // Factors used for performance adjustments
+  const weightFactor = 0.5; // Adjustment factor for weight
+  const tempFactor = 0.3; // Adjustment factor for temperature
+  const elevationFactor = 0.2; // Adjustment factor for elevation (not used here)
+  const runwayFactor = 0.1; // Adjustment factor for runway length
+  
+  // Base speeds for takeoff (V1, VR, V2)
+  let v1Base = 130; // Base decision speed
+  let vrBase = 138; // Base rotation speed
+  let v2Base = 140; // Base safety speed
+  
+  // Calculate weight adjustment based on takeoff weight
+  const weightInTons = params.takeoffWeight / 1000; // Convert weight to tons
+  const weightAdjustment = (weightInTons - 65) * weightFactor; // Adjust based on deviation from 65 tons
+  
+  // Calculate temperature adjustment based on deviation from 15°C
+  const tempAdjustment = (params.temperature - 15) * tempFactor;
+  
+  // Calculate adjusted takeoff speeds
+  let v1 = Math.round(v1Base + weightAdjustment + tempAdjustment); // Adjusted V1
+  let vr = Math.round(vrBase + weightAdjustment + tempAdjustment); // Adjusted VR
+  let v2 = Math.round(v2Base + weightAdjustment + tempAdjustment); // Adjusted V2
+  
+  // Adjust speeds based on flap setting
+  const flapNum = parseInt(params.flapSetting) || 1; // Parse flap setting, default to 1
+  v1 -= (flapNum - 1) * 2; // Reduce V1 for higher flap settings
+  vr -= (flapNum - 1) * 2; // Reduce VR for higher flap settings
+  v2 -= (flapNum - 1) * 1; // Reduce V2 for higher flap settings
+  
+  // Adjust speeds for FLEX thrust setting
+  if (params.thrustSetting === 'FLEX') {
+    v1 += 2; // Increase V1 slightly for FLEX
+    vr += 2; // Increase VR slightly for FLEX
+    v2 += 1; // Increase V2 slightly for FLEX
+  }
+  
+  // Adjust speeds based on runway surface condition
+  if (params.surfaceCondition === 'Wet') {
+    v1 += 5; // Increase V1 for wet runway
+    vr += 3; // Increase VR for wet runway
+  } else if (params.surfaceCondition === 'Contaminated') {
+    v1 += 10; // Increase V1 for contaminated runway
+    vr += 5; // Increase VR for contaminated runway
+  }
+  
+  // Calculate maximum allowable takeoff weight based on runway length
+  const maxWeightBase = 78000; // Base maximum weight in kilograms
+  const runwayLengthAdjustment = (params.toraLength - 2500) * runwayFactor; // Adjust based on runway length
+  const maxWeight = Math.round(maxWeightBase + runwayLengthAdjustment); // Final maximum weight
+  
+  // Calculate "green dot" speed (economical climb speed)
+  const greenDot = Math.round(220 * Math.sqrt(params.takeoffWeight / 70000)); // Based on weight
+  
+  // Determine the limiting factor for takeoff
+  let limitedBy = 'Max Takeoff Weight'; // Default limiting factor
+  if (params.takeoffWeight > maxWeight) {
+    limitedBy = 'Runway Length'; // Limited by runway length if weight exceeds max
+  } else if (params.temperature > 35) {
+    limitedBy = 'Temperature'; // Limited by temperature if too high
+  }
+  
+  // Adjust V2 for improved climb performance if enabled
+  if (params.useImprovedClimb) {
+    v2 += 5; // Increase V2 for improved climb
+  }
+  // Calculate FLEX Temperature (assumed temp)
+const maxFlexTemp = 65;
+const minFlexTemp = params.temperature + 5; // Must be at least 5°C above OAT
+let flexTemp = params.temperature + 15; // Base assumption
+
+// Adjust based on aircraft weight ratio
+const weightRatio = params.takeoffWeight / maxWeight;
+if (weightRatio > 0.9) {
+  flexTemp -= 5;
+} else if (weightRatio < 0.7) {
+  flexTemp += 5;
+}
+
+// Adjust based on runway length
+if (params.toraLength < 6561.68) {
+  flexTemp -= 5;
+} else if (params.toraLength > 10000) {
+  flexTemp += 5;
+}
+
+
+
+// Clamp flexTemp within valid range
+flexTemp = Math.max(minFlexTemp, Math.min(flexTemp, maxFlexTemp));
+
+  
+  // Construct the result object with all calculated values
+  const result = {
+    registration: 'N320SB', // Aircraft registration (hardcoded for now)
+    aircraftType: params.aircraftType === 'a320ceo' ? 'A320-200' : 'A320neo', // Aircraft type name
+    engineType: engine?.name || 'CFM56-5B4/P', // Engine name (fallback to default if not found)
+    weight: params.takeoffWeight, // Takeoff weight
+    weightUnit: params.weightUnit, // Weight unit (e.g., kg or lbs)
+    bleedSetting: params.bleedSetting, // Bleed air setting
+    antiIceSetting: params.antiIceSetting, // Anti-ice setting
+    flapSetting: params.flapSetting, // Flap setting
+    thrustSetting: params.thrustSetting, // Thrust setting
+    temperature: Math.round(flexTemp), // Outside air temperature
+    v1: v1, // Final V1 speed
+    vr: vr, // Final VR speed
+    v2: v2, // Final V2 speed
+    maxWeight: maxWeight, // Maximum allowable takeoff weight
+    limitedBy: limitedBy, // Limiting factor for takeoff
+    greenDot: greenDot, // Green dot speed
+    status: 'success' // Status of the calculation
+  };
+  
+  // Add a warning message if takeoff weight exceeds maximum weight
+  if (params.takeoffWeight > maxWeight) {
+    result.message = 'Warning: Takeoff weight exceeds maximum allowed weight for this runway.';
+    result.status = 'warning'; // Change status to warning
+  }
+  
+  // Return the result object
+  return result;
+};

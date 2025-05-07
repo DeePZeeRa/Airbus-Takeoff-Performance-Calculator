@@ -1,0 +1,1 @@
+// Removed TypeScript-specific syntax.
