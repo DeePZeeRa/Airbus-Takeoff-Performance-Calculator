@@ -110,7 +110,7 @@ const WeatherConditions = ({
 
         <div className="flex flex-col">
           <div className="flex items-center mb-2">
-            <label className="text-gray-500 text-sm font-medium">Pressure (inHg)</label>
+            <label className="text-gray-500 text-sm font-medium">Pressure (hPa)</label>
             <div className="ml-1 text-gray-400 cursor-help group relative">
               <Info size={16} />
               <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-800 text-xs text-white p-2 rounded shadow-lg w-48">
